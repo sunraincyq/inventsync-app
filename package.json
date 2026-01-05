@@ -1,0 +1,26 @@
+{
+    "name": "inventsync-app",
+    "version": "1.0.0",
+    "private": true,
+    "description": "InventSync - Multi-Channel Inventory Management Platform",
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+        "dev:api": "npm run dev -w apps/api",
+        "dev:web": "npm run dev -w apps/web",
+        "dev:mobile": "npm run start -w apps/mobile",
+        "build": "npm run build -w apps/api && npm run build -w apps/web",
+        "lint": "npm run lint -w apps/web",
+        "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2",
+        "typescript": "^5.3.3"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
