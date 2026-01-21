@@ -2,7 +2,7 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Alert 
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import api from '@/services/api';
+import { api } from '@/services/api';
 import { useColorScheme } from '@/components/useColorScheme';
 
 const CONDITIONS = ['NEW', 'LIKE_NEW', 'VERY_GOOD', 'GOOD', 'ACCEPTABLE'];

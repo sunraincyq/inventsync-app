@@ -1,8 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 // API Configuration and Service for InventSync Mobile
 
 // Update this to your machine's local IP when testing on physical device
 // Use 'localhost' for emulator, or your machine's IP (e.g., '192.168.1.100') for physical device
 const API_BASE_URL = 'http://10.0.2.2:5001'; // 10.0.2.2 is Android emulator's localhost
+const API_URL_KEY = '@inventsync_api_url';
 
 interface ApiResponse<T> {
     success: boolean;
@@ -55,6 +58,26 @@ class ApiService {
 
     constructor(baseUrl: string = API_BASE_URL) {
         this.baseUrl = baseUrl;
+    }
+
+    setBaseUrl(url: string) {
+        this.baseUrl = url;
+    }
+
+    async loadBaseUrl() {
+        try {
+            const storedUrl = await AsyncStorage.getItem(API_URL_KEY);
+            if (storedUrl) {
+                this.baseUrl = storedUrl;
+                console.log('Loaded API URL:', storedUrl);
+            }
+        } catch (error) {
+            console.error('Failed to load API URL:', error);
+        }
+    }
+
+    getBaseUrl(): string {
+        return this.baseUrl;
     }
 
     private async request<T>(
@@ -150,5 +173,6 @@ class ApiService {
     }
 }
 
+
 export const api = new ApiService();
-export default api;
+// export default api; // Removed to avoid ESM default interop issues

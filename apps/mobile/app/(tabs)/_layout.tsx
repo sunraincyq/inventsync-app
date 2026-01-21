@@ -1,10 +1,16 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
 import { useColorScheme } from '@/components/useColorScheme';
+import { api } from '@/services/api';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+
+  useEffect(() => {
+    api.loadBaseUrl();
+  }, []);
 
   return (
     <Tabs
@@ -32,6 +38,13 @@ export default function TabLayout() {
         options={{
           title: 'eBay',
           tabBarIcon: ({ color }) => <FontAwesome size={24} name="shopping-cart" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color }) => <FontAwesome size={24} name="cog" color={color} />,
         }}
       />
     </Tabs>

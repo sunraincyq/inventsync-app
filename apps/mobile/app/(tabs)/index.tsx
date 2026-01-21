@@ -2,11 +2,12 @@ import { StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, Ale
 import { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import api, { Product } from '@/services/api';
+import { api, Product, Listing } from '@/services/api';
 import { useColorScheme } from '@/components/useColorScheme';
 
 export default function ProductsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [listings, setListings] = useState<Record<string, Listing>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,14 +15,27 @@ export default function ProductsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const fetchProducts = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setError(null);
-      const response = await api.getProducts();
-      if (response.success && response.data) {
-        setProducts(response.data);
+      const [productsRes, listingsRes] = await Promise.all([
+        api.getProducts(),
+        api.getEbayListings(),
+      ]);
+
+      if (productsRes.success && productsRes.data) {
+        setProducts(productsRes.data);
       } else {
-        setError(response.error || 'Failed to load products');
+        setError(productsRes.error || 'Failed to load products');
+      }
+
+      if (listingsRes.success && listingsRes.data) {
+        // Create a map of product_id -> listing for quick lookup
+        const listingsMap: Record<string, Listing> = {};
+        listingsRes.data.forEach((listing) => {
+          listingsMap[listing.product_id] = listing;
+        });
+        setListings(listingsMap);
       }
     } catch (err) {
       setError('Network error. Is the API running?');
@@ -32,13 +46,13 @@ export default function ProductsScreen() {
   }, []);
 
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    fetchData();
+  }, [fetchData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchProducts();
-  }, [fetchProducts]);
+    fetchData();
+  }, [fetchData]);
 
   const handleDelete = (product: Product) => {
     Alert.alert(
@@ -62,15 +76,33 @@ export default function ProductsScreen() {
     );
   };
 
+  const getListingBadge = (productId: string) => {
+    const listing = listings[productId];
+    if (!listing) return null;
+
+    const isActive = listing.status === 'active';
+    return (
+      <View style={[styles.listingBadge, isActive ? styles.badgeActive : styles.badgePending]}>
+        <FontAwesome name="shopping-cart" size={10} color={isActive ? '#22c55e' : '#f59e0b'} />
+        <Text style={[styles.badgeText, { color: isActive ? '#22c55e' : '#f59e0b' }]}>
+          {isActive ? 'Listed' : listing.status}
+        </Text>
+      </View>
+    );
+  };
+
   const renderProduct = ({ item }: { item: Product }) => (
     <TouchableOpacity
       style={[styles.productCard, isDark && styles.productCardDark]}
       onPress={() => router.push(`/product/${item.id}`)}
     >
       <View style={styles.productInfo}>
-        <Text style={[styles.productTitle, isDark && styles.textLight]} numberOfLines={1}>
-          {item.title}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.productTitle, isDark && styles.textLight]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          {getListingBadge(item.id)}
+        </View>
         <Text style={[styles.productSku, isDark && styles.textMuted]}>SKU: {item.sku}</Text>
         <View style={styles.productMeta}>
           <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
@@ -97,7 +129,7 @@ export default function ProductsScreen() {
         <View style={[styles.center, styles.errorContainer]}>
           <FontAwesome name="exclamation-triangle" size={48} color="#f59e0b" />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchProducts}>
+          <TouchableOpacity style={styles.retryBtn} onPress={fetchData}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -110,6 +142,28 @@ export default function ProductsScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          ListHeaderComponent={products.length > 0 ? (
+            <View style={[styles.statsContainer, isDark && styles.statsContainerDark]}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, isDark && styles.textLight]}>{products.length}</Text>
+                <Text style={[styles.statLabel, isDark && styles.textMuted]}>Products</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, isDark && styles.textLight]}>
+                  ${products.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(0)}
+                </Text>
+                <Text style={[styles.statLabel, isDark && styles.textMuted]}>Value</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: '#22c55e' }]}>
+                  {Object.keys(listings).length}
+                </Text>
+                <Text style={[styles.statLabel, isDark && styles.textMuted]}>Listed</Text>
+              </View>
+            </View>
+          ) : null}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <FontAwesome name="inbox" size={48} color="#9ca3af" />
@@ -167,11 +221,35 @@ const styles = StyleSheet.create({
   productInfo: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   productTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 4,
+    flex: 1,
+  },
+  listingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  badgeActive: {
+    backgroundColor: '#dcfce7',
+  },
+  badgePending: {
+    backgroundColor: '#fef3c7',
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   productSku: {
     fontSize: 12,
@@ -257,5 +335,39 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 8,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statsContainerDark: {
+    backgroundColor: '#1f2937',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#e5e7eb',
+    marginHorizontal: 8,
   },
 });

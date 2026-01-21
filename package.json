@@ -3,10 +3,17 @@
     "version": "1.0.0",
     "private": true,
     "description": "InventSync - Multi-Channel Inventory Management Platform",
-    "workspaces": [
-        "apps/*",
-        "packages/*"
-    ],
+    "workspaces": {
+        "packages": [
+            "apps/*",
+            "packages/*"
+        ],
+        "nohoist": [
+            "**/react-native",
+            "**/react-native/**",
+            "mobile/**"
+        ]
+    },
     "scripts": {
         "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
         "dev:api": "npm run dev -w apps/api",

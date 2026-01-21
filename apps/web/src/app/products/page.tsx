@@ -60,7 +60,10 @@ export default function ProductsPage() {
         }
     };
 
-    const deleteProduct = async (id: string) => {
+    const deleteProduct = async (e: React.MouseEvent<HTMLButtonElement>, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+
         if (!confirm('Are you sure you want to delete this product?')) return;
 
         try {
@@ -202,7 +205,7 @@ export default function ProductsPage() {
                                             Edit
                                         </a>
                                         <button
-                                            onClick={() => deleteProduct(product.id)}
+                                            onClick={(e) => deleteProduct(e, product.id)}
                                             className="text-red-600 hover:text-red-900"
                                         >
                                             Delete

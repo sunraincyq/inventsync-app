@@ -185,6 +185,7 @@ export class EbayService {
     }
 
     // Get business policies (fulfillment, payment, return)
+    // Get business policies (fulfillment, payment, return)
     async getBusinessPolicies(): Promise<{
         fulfillmentPolicyId: string;
         paymentPolicyId: string;
@@ -204,6 +205,28 @@ export class EbayService {
             );
             if (fulfillmentResp.data.fulfillmentPolicies?.length > 0) {
                 result.fulfillmentPolicyId = fulfillmentResp.data.fulfillmentPolicies[0].fulfillmentPolicyId;
+            } else {
+                // Create default fulfillment policy
+                const createResp = await axios.post(
+                    `${this.baseUrl}/sell/account/v1/fulfillment_policy`,
+                    {
+                        name: `Default-Fulfillment-${Date.now()}`,
+                        marketplaceId: 'EBAY_US',
+                        categoryTypes: [{ name: 'ALL_EXCLUDING_MOTORS_VEHICLES' }],
+                        handlingTime: { value: 3, unit: 'DAY' },
+                        shippingOptions: [{
+                            costType: 'FLAT_RATE',
+                            optionType: 'DOMESTIC',
+                            shippingServices: [{
+                                shippingServiceCode: 'USPSPriority',
+                                shippingCost: { value: '0.00', currency: 'USD' }
+                            }]
+                        }]
+                    },
+                    { headers: this.headers() }
+                );
+                result.fulfillmentPolicyId = createResp.data.fulfillmentPolicyId;
+                console.log('Created default fulfillment policy:', result.fulfillmentPolicyId);
             }
 
             // Get payment policies
@@ -213,6 +236,20 @@ export class EbayService {
             );
             if (paymentResp.data.paymentPolicies?.length > 0) {
                 result.paymentPolicyId = paymentResp.data.paymentPolicies[0].paymentPolicyId;
+            } else {
+                // Create default payment policy
+                const createResp = await axios.post(
+                    `${this.baseUrl}/sell/account/v1/payment_policy`,
+                    {
+                        name: `Default-Payment-${Date.now()}`,
+                        marketplaceId: 'EBAY_US',
+                        categoryTypes: [{ name: 'ALL_EXCLUDING_MOTORS_VEHICLES' }],
+                        paymentMethods: [{ paymentMethodType: 'PAYPAL', recipientAccountReference: { referenceId: 'test@example.com' } }]
+                    },
+                    { headers: this.headers() }
+                );
+                result.paymentPolicyId = createResp.data.paymentPolicyId;
+                console.log('Created default payment policy:', result.paymentPolicyId);
             }
 
             // Get return policies
@@ -222,9 +259,26 @@ export class EbayService {
             );
             if (returnResp.data.returnPolicies?.length > 0) {
                 result.returnPolicyId = returnResp.data.returnPolicies[0].returnPolicyId;
+            } else {
+                // Create default return policy
+                const createResp = await axios.post(
+                    `${this.baseUrl}/sell/account/v1/return_policy`,
+                    {
+                        name: `Default-Return-${Date.now()}`,
+                        marketplaceId: 'EBAY_US',
+                        categoryTypes: [{ name: 'ALL_EXCLUDING_MOTORS_VEHICLES' }],
+                        returnsAccepted: true,
+                        returnPeriod: { value: 30, unit: 'DAY' },
+                        refundMethod: 'MONEY_BACK',
+                        returnShippingCostPayer: 'BUYER'
+                    },
+                    { headers: this.headers() }
+                );
+                result.returnPolicyId = createResp.data.returnPolicyId;
+                console.log('Created default return policy:', result.returnPolicyId);
             }
         } catch (error: any) {
-            console.warn('Could not fetch business policies:', error.message);
+            console.warn('Could not fetch/create business policies:', error.response?.data || error.message);
         }
 
         return result;

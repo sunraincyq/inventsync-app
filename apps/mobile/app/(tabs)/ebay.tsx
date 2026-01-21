@@ -1,7 +1,7 @@
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Alert, RefreshControl } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import api, { EbayConnection, Listing } from '@/services/api';
+import { api, EbayConnection, Listing } from '@/services/api';
 import { useColorScheme } from '@/components/useColorScheme';
 
 export default function EbayScreen() {

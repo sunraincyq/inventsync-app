@@ -2,7 +2,7 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Alert,
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import api, { Product } from '@/services/api';
+import { api, Product, Listing } from '@/services/api';
 import { useColorScheme } from '@/components/useColorScheme';
 
 export default function ProductDetailScreen() {

@@ -21,7 +21,7 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps)
         if (!origin) return callback(null, true);
         // Allow localhost origins for web and mobile development
-        if (origin.includes('localhost') || origin.includes('10.0.2.2') || origin.includes('127.0.0.1')) {
+        if (origin.includes('localhost') || origin.includes('10.0.2.2') || origin.includes('127.0.0.1') || origin.includes('192.168.')) {
             return callback(null, true);
         }
         // Allow configured origin
