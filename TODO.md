@@ -16,9 +16,12 @@ _No active bugs at this time._
 - [x] eBay connection flow
 - [x] List to eBay functionality
 - [x] Fix: Delete confirmation popup flashing (2026-01-20) - Added proper event handling
+- [x] eBay Category Search (Mobile)
+- [x] Photo Upload / Camera (Mobile)
+- [x] Product Status Dropdown (Mobile)
 
 ---
 
 ## 🚀 New Features (Mobile)
-- [ ] **eBay Category Search**: Implement `CategorySearchModal` in mobile app with backend endpoint to search eBay category tree. Currently, users must manually input ID.
+_No pending features._
 

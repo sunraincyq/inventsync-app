@@ -41,6 +41,7 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+app.use('/uploads', express.static('uploads'));
 app.use('/api/products', productsRouter);
 app.use('/api/ebay', ebayRouter);
 

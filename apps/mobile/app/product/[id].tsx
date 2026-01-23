@@ -1,7 +1,9 @@
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Dimensions } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import * as ImagePicker from 'expo-image-picker';
+import { Modal } from 'react-native';
 import { api, Product, Listing } from '@/services/api';
 import { useColorScheme } from '@/components/useColorScheme';
 
@@ -28,6 +30,8 @@ export default function ProductDetailScreen() {
     const [condition, setCondition] = useState('NEW');
     const [brand, setBrand] = useState('');
     const [category, setCategory] = useState('');
+    const [images, setImages] = useState<string[]>([]);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
     useEffect(() => {
         fetchProduct();
@@ -47,13 +51,39 @@ export default function ProductDetailScreen() {
                 setQuantity(p.quantity.toString());
                 setCondition(p.condition);
                 setBrand(p.brand || '');
+                setBrand(p.brand || '');
                 setCategory(p.category || '');
+                setImages(p.images || []);
             }
         } catch (err) {
             Alert.alert('Error', 'Failed to load product');
         } finally {
             setLoading(false);
         }
+    };
+
+    const pickImage = async (useCamera: boolean) => {
+        const options: ImagePicker.ImagePickerOptions = {
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.8,
+        };
+
+        let result;
+        if (useCamera) {
+            await ImagePicker.requestCameraPermissionsAsync();
+            result = await ImagePicker.launchCameraAsync(options);
+        } else {
+            result = await ImagePicker.launchImageLibraryAsync(options);
+        }
+
+        if (!result.canceled && result.assets[0]) {
+            setImages([...images, result.assets[0].uri]);
+        }
+    };
+
+    const removeImage = (index: number) => {
+        setImages(images.filter((_, i) => i !== index));
     };
 
     const handleSave = async () => {
@@ -64,7 +94,7 @@ export default function ProductDetailScreen() {
 
         setSaving(true);
         try {
-            const response = await api.updateProduct(id!, {
+            const productData = {
                 title: title.trim(),
                 description: description.trim(),
                 price: parseFloat(price),
@@ -72,7 +102,36 @@ export default function ProductDetailScreen() {
                 condition,
                 brand: brand.trim(),
                 category: category.trim(),
+            };
+
+            let response;
+            // Always use FormData if editing to handle potential image changes
+            // Or only if images changed? Use FormData to be safe and consistent with create
+            const formData = new FormData();
+
+            // Append standard fields
+            Object.keys(productData).forEach(key => {
+                formData.append(key, String(productData[key as keyof typeof productData]));
             });
+
+            // Handle images
+            // 1. Existing remote images (strings starting with http) need to be sent as JSON list
+            const existingImages = images.filter(img => img.startsWith('http'));
+            formData.append('images', JSON.stringify(existingImages));
+
+            // 2. New local images (file URIs) need to be appended as files
+            const newImages = images.filter(img => !img.startsWith('http'));
+
+            newImages.forEach((uri, index) => {
+                const filename = uri.split('/').pop() || `image_new_${index}.jpg`;
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1]}` : `image`;
+
+                // @ts-ignore
+                formData.append('images', { uri, name: filename, type });
+            });
+
+            response = await api.updateProduct(id!, formData);
 
             if (response.success && response.data) {
                 setProduct(response.data);
@@ -157,6 +216,54 @@ export default function ProductDetailScreen() {
                 <View style={[styles.card, isDark && styles.cardDark]}>
                     {editing ? (
                         <>
+                            <Modal
+                                visible={!!previewImage}
+                                transparent={true}
+                                animationType="fade"
+                                onRequestClose={() => setPreviewImage(null)}
+                            >
+                                <View style={styles.previewOverlay}>
+                                    <TouchableOpacity
+                                        style={styles.closePreviewBtn}
+                                        onPress={() => setPreviewImage(null)}
+                                    >
+                                        <FontAwesome name="times" size={24} color="#fff" />
+                                    </TouchableOpacity>
+                                    {previewImage && (
+                                        <Image
+                                            source={{ uri: previewImage }}
+                                            style={styles.fullImage}
+                                            resizeMode="contain"
+                                        />
+                                    )}
+                                </View>
+                            </Modal>
+
+                            <Text style={[styles.label, isDark && styles.textLight]}>Photos</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoList}>
+                                {images.map((uri, index) => (
+                                    <View key={index} style={styles.photoContainer}>
+                                        <TouchableOpacity onPress={() => setPreviewImage(uri)}>
+                                            <Image source={{ uri }} style={styles.photo} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.removePhotoBtn}
+                                            onPress={() => removeImage(index)}
+                                        >
+                                            <FontAwesome name="times" size={12} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                                <View style={styles.photoActions}>
+                                    <TouchableOpacity style={styles.addPhotoBtn} onPress={() => pickImage(false)}>
+                                        <FontAwesome name="image" size={20} color="#2563eb" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.addPhotoBtn} onPress={() => pickImage(true)}>
+                                        <FontAwesome name="camera" size={20} color="#2563eb" />
+                                    </TouchableOpacity>
+                                </View>
+                            </ScrollView>
+
                             <Text style={[styles.label, isDark && styles.textLight]}>Title *</Text>
                             <TextInput
                                 style={[styles.input, isDark && styles.inputDark]}
@@ -238,6 +345,24 @@ export default function ProductDetailScreen() {
                         </>
                     ) : (
                         <>
+                            {/* Product Images */}
+                            {product.images && product.images.length > 0 ? (
+                                <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+                                    {product.images.map((img, index) => (
+                                        <View key={index} style={styles.imageContainer}>
+                                            <Image
+                                                source={{ uri: img }}
+                                                style={styles.productImage}
+                                                resizeMode="contain"
+                                            />
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            ) : (
+                                <View style={[styles.imageContainer, styles.placeholderContainer]}>
+                                    <FontAwesome name="image" size={48} color="#d1d5db" />
+                                </View>
+                            )}
                             <Text style={[styles.productTitle, isDark && styles.textLight]}>{product.title}</Text>
                             <Text style={[styles.sku, isDark && styles.textMuted]}>SKU: {product.sku}</Text>
 
@@ -369,6 +494,26 @@ const styles = StyleSheet.create({
     },
     cardDark: {
         backgroundColor: '#1f2937',
+    },
+    imageScroll: {
+        marginBottom: 16,
+        height: 250,
+    },
+    imageContainer: {
+        width: Dimensions.get('window').width - 64, // Card padding (16*2) + Screen padding (16*2)
+        height: 250,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f9fafb',
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    placeholderContainer: {
+        marginBottom: 16,
+    },
+    productImage: {
+        width: '100%',
+        height: '100%',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -530,5 +675,67 @@ const styles = StyleSheet.create({
     errorText: {
         fontSize: 16,
         color: '#ef4444',
+    },
+    // Photo editing styles
+    photoList: {
+        marginBottom: 16,
+    },
+    photoContainer: {
+        marginRight: 10,
+        position: 'relative',
+    },
+    photo: {
+        width: 100,
+        height: 100,
+        borderRadius: 8,
+        backgroundColor: '#e5e7eb',
+    },
+    removePhotoBtn: {
+        position: 'absolute',
+        top: -8,
+        right: -8,
+        backgroundColor: '#ef4444',
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#fff',
+    },
+    photoActions: {
+        flexDirection: 'row',
+        gap: 10,
+        alignItems: 'center',
+        paddingLeft: 4,
+    },
+    addPhotoBtn: {
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#d1d5db',
+        borderStyle: 'dashed',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f9fafb',
+    },
+    // Preview Modal
+    previewOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fullImage: {
+        width: '100%',
+        height: '90%',
+    },
+    closePreviewBtn: {
+        position: 'absolute',
+        top: 40,
+        right: 20,
+        zIndex: 10,
+        padding: 10,
     },
 });

@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Update this to your machine's local IP when testing on physical device
 // Use 'localhost' for emulator, or your machine's IP (e.g., '192.168.1.100') for physical device
-const API_BASE_URL = 'http://10.0.2.2:5001'; // 10.0.2.2 is Android emulator's localhost
+const API_BASE_URL = 'http://192.168.68.107:5001'; // Updated for physical device testing
 const API_URL_KEY = '@inventsync_api_url';
 
 interface ApiResponse<T> {
@@ -85,12 +85,19 @@ class ApiService {
         options: RequestInit = {}
     ): Promise<ApiResponse<T>> {
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                ...options.headers as Record<string, string>,
+            };
+
+            // If Content-Type is multipart/form-data, let the browser/runtime set it with boundary
+            if (headers['Content-Type'] === 'multipart/form-data') {
+                delete headers['Content-Type'];
+            }
+
             const response = await fetch(`${this.baseUrl}${endpoint}`, {
                 ...options,
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...options.headers,
-                },
+                headers,
             });
             return await response.json();
         } catch (error) {
@@ -119,17 +126,21 @@ class ApiService {
         return this.request<Product>(`/api/products/${id}`);
     }
 
-    async createProduct(product: Partial<Product>): Promise<ApiResponse<Product>> {
+    async createProduct(product: Partial<Product> | FormData): Promise<ApiResponse<Product>> {
+        const isFormData = product instanceof FormData;
         return this.request<Product>('/api/products', {
             method: 'POST',
-            body: JSON.stringify(product),
+            body: isFormData ? product : JSON.stringify(product),
+            headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
         });
     }
 
-    async updateProduct(id: string, product: Partial<Product>): Promise<ApiResponse<Product>> {
+    async updateProduct(id: string, product: Partial<Product> | FormData): Promise<ApiResponse<Product>> {
+        const isFormData = product instanceof FormData;
         return this.request<Product>(`/api/products/${id}`, {
             method: 'PUT',
-            body: JSON.stringify(product),
+            body: isFormData ? product : JSON.stringify(product),
+            headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
         });
     }
 
@@ -137,6 +148,10 @@ class ApiService {
         return this.request<void>(`/api/products/${id}`, {
             method: 'DELETE',
         });
+    }
+
+    async searchCategories(query: string): Promise<ApiResponse<{ id: string; name: string }[]>> {
+        return this.request<{ id: string; name: string }[]>(`/api/ebay/categories/search?q=${encodeURIComponent(query)}`);
     }
 
     // eBay
